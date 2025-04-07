@@ -75,7 +75,7 @@ async def scrape_kakao_book_with_playwright(url):
         try:
             await page.goto(url)
 
-            target_element = await page.wait_for_selector(".desc", timeout=3000)
+            target_element = await page.wait_for_selector(".desc", timeout=10000)
             html_content = await target_element.inner_html()
             soup = BeautifulSoup(html_content, "html.parser")
 
