@@ -8,7 +8,6 @@ from datetime import datetime
 import aiohttp
 import os
 from dotenv import load_dotenv
-import time
 
 # nest-asyncio 설정
 nest_asyncio.apply()
@@ -75,7 +74,9 @@ async def scrape_kakao_book_with_playwright(url):
         try:
             await page.goto(url)
 
-            target_element = await page.wait_for_selector(".desc", timeout=10000)
+            target_element = await page.wait_for_selector(
+                ".desc", timeout=10000, state="visible"
+            )
             html_content = await target_element.inner_html()
             soup = BeautifulSoup(html_content, "html.parser")
 
