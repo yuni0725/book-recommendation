@@ -19,17 +19,29 @@ error_books_df = pd.DataFrame(columns=["자료명"])  # 에러 도서를 저장�
 # .env 파일에서 API 키 로드
 load_dotenv()
 APIKey = os.getenv("KAKAO_API_KEY")
+ttbkey = os.getenv("ALADIN_API_KEY2")
 
 
-async def search_kakao_book(title):
-    base_url = "https://dapi.kakao.com/v3/search/book?target=title"
+def create_default_aladin_info():
+    """알라딘 API 응답이 실패했을 때 사용할 기본값을 반환하는 함수"""
+    return {
+        "알라딘표지": None,
+        "알라딘ISBN13": None,
+        "알라딘설명": None,
+        "알라딘카테고리ID": None,
+        "알라딘카테고리명": None,
+    }
+
+
+async def search_kakao_book(isbn):
+    base_url = "https://dapi.kakao.com/v3/search/book?target=isbn"
     headers = {"Authorization": f"KakaoAK {APIKey}"}
     params = {
-        "query": str(title),
+        "query": str(isbn),
         "sort": "accuracy",
         "page": 1,
         "size": 10,
-        "target": "title",
+        "target": "ISBN",
     }
 
     try:
@@ -40,21 +52,23 @@ async def search_kakao_book(title):
                 result = await response.json()
                 book_result = result["documents"][0]
 
+                isbn = book_result["isbn"].split(" ")[1]
+
                 processed_book = {
-                    "제목": book_result["title"],
-                    "저자": ", ".join(book_result["authors"]),
-                    "번역자": (
+                    "카카오제목": book_result["title"],
+                    "카카오작가": ", ".join(book_result["authors"]),
+                    "카카오번역자": (
                         ", ".join(book_result["translators"])
                         if book_result["translators"]
                         else None
                     ),
-                    "ISBN": book_result["isbn"],
-                    "출판사": book_result["publisher"],
-                    "출간일": pd.to_datetime(book_result["datetime"]).strftime(
+                    "카카오ISBN": isbn,
+                    "카카오출판사": book_result["publisher"],
+                    "카카오출간일": pd.to_datetime(book_result["datetime"]).strftime(
                         "%Y-%m-%d"
                     ),
-                    "썸네일": book_result["thumbnail"],
-                    "URL": book_result["url"],
+                    "카카오썸네일": book_result["thumbnail"],
+                    "카카오URL": book_result["url"],
                 }
 
                 if processed_book:
@@ -74,9 +88,7 @@ async def scrape_kakao_book_with_playwright(url):
         try:
             await page.goto(url)
 
-            target_element = await page.wait_for_selector(
-                ".desc", timeout=10000, state="visible"
-            )
+            target_element = await page.wait_for_selector(".desc", timeout=3000)
             html_content = await target_element.inner_html()
             soup = BeautifulSoup(html_content, "html.parser")
 
@@ -97,7 +109,7 @@ async def combine_book_info_with_description(book_info, kakao_book_info, url):
     # book_info를 딕셔너리로 변환
     book_info_dict = book_info.to_dict("records")[0]
 
-    # aladin_book_info와 book_info_dict를 합침
+    # kakao_book_info와 book_info_dict를 합침
     combined_dict = {**book_info_dict, **kakao_book_info}
 
     # 하나의 행을 가진 데이터프레임으로 변환
@@ -106,14 +118,14 @@ async def combine_book_info_with_description(book_info, kakao_book_info, url):
 
 def create_default_kakao_info():
     return {
-        "제목": None,
-        "저자": None,
-        "번역자": None,
-        "ISBN": None,
-        "출판사": None,
-        "출간일": None,
-        "썸네일": None,
-        "URL": None,
+        "카카오제목": None,
+        "카카오작가": None,
+        "카카오번역자": None,
+        "카카오ISBN": None,
+        "카카오출판사": None,
+        "카카오출간일": None,
+        "카카오썸네일": None,
+        "카카오URL": None,
     }
 
 
@@ -137,7 +149,8 @@ def save_error_books():
 async def process_book(book_info):
     global ERROR_COUNT, error_books_df
     book_title = book_info["자료명"].iloc[0]
-    kakao_book_info = await search_kakao_book(book_title)
+    book_isbn = book_info["ISBN"].iloc[0]
+    kakao_book_info = await search_kakao_book(book_isbn)
 
     if "error" in kakao_book_info:
         ERROR_COUNT += 1
@@ -149,7 +162,7 @@ async def process_book(book_info):
         return pd.DataFrame([{**book_info.to_dict("records")[0], **default_info}])
 
     try:
-        url = kakao_book_info["URL"]
+        url = kakao_book_info["카카오URL"]
         return await combine_book_info_with_description(book_info, kakao_book_info, url)
 
     except Exception as e:
