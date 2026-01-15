@@ -27,6 +27,7 @@ share/python-wheels/
 MANIFEST
 
 plan.txt
+.cursorrules
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -34,7 +35,6 @@ plan.txt
 *.manifest
 *.spec
 
-.cursorrules
 
 # Installer logs
 pip-log.txt
